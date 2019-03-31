@@ -11,5 +11,5 @@ build:
 
     artifacts:
         paths:
-        - *.rpx
+        - wiiu-vnc.rpx
         name: "${CI_JOB_NAME}-${CI_COMMIT_REF_NAME}"
