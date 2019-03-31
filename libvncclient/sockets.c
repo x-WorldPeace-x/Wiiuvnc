@@ -36,33 +36,8 @@
 #include <errno.h>
 #include <assert.h>
 #include <rfb/rfbclient.h>
-#ifdef WIN32
-#undef SOCKET
-#include <winsock2.h>
-#ifdef EWOULDBLOCK
-#undef EWOULDBLOCK
-#endif
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#define close closesocket
-#define read(sock,buf,len) recv(sock,buf,len,0)
-#define write(sock,buf,len) send(sock,buf,len,0)
-#define socklen_t int
-#ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
-#undef socklen_t
-#include <ws2tcpip.h>
-#endif
-#elif defined(__WIIU__)
-#include <nsysnet/socket.h>
-#define close socketclose
-#define TCP_NODELAY      0x2004
-#else
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <sys/un.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#endif
+#include <wiiu-socket.h>
+
 #include "tls.h"
 #include "sasl.h"
 
@@ -79,11 +54,11 @@ rfbBool errorMessageOnReadFailure = TRUE;
  * server.  It is non-trivial for two reasons:
  *
  * 1. For efficiency it performs some intelligent buffering, avoiding invoking
- *    the read() system call too often.  For small chunks of data, it simply
+ *    the recv() system call too often.  For small chunks of data, it simply
  *    copies the data out of an internal buffer.  For large amounts of data it
  *    reads directly into the buffer provided by the caller.
  *
- * 2. Whenever read() would block, it invokes the Xt event dispatching
+ * 2. Whenever recv() would block, it invokes the Xt event dispatching
  *    mechanism to process X events.  In fact, this is the only place these
  *    events are processed, as there is no XtAppMainLoop in the program.
  */
@@ -169,7 +144,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
         i = ReadFromSASL(client, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
       else {
 #endif /* LIBVNCSERVER_HAVE_SASL */
-        i = read(client->sock, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered);
+        i = recv(client->sock, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered, 0);
 #ifdef WIN32
 	if (i < 0) errno=WSAGetLastError();
 #endif
@@ -215,7 +190,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
         i = ReadFromSASL(client, out, n);
       else
 #endif
-        i = read(client->sock, out, n);
+        i = recv(client->sock, out, n, 0);
 
       if (i <= 0) {
 	if (i < 0) {
@@ -300,7 +275,7 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
 #endif /* LIBVNCSERVER_HAVE_SASL */
 
   while (i < n) {
-    j = write(client->sock, obuf + i, (n - i));
+    j = send(client->sock, obuf + i, (n - i), 0);
     if (j <= 0) {
       if (j < 0) {
 #ifdef WIN32
@@ -378,14 +353,14 @@ ConnectClientToTcpAddr(unsigned int host, int port)
 
   if (connect(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
     rfbClientErr("ConnectToTcpAddr: connect\n");
-    close(sock);
+    socketclose(sock);
     return -1;
   }
 
   if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		 (char *)&one, sizeof(one)) < 0) {
     rfbClientErr("ConnectToTcpAddr: setsockopt\n");
-    close(sock);
+    socketclose(sock);
     return -1;
   }
 
@@ -424,7 +399,7 @@ ConnectClientToTcpAddr6(const char *hostname, int port)
     {
       if (connect(sock, res->ai_addr, res->ai_addrlen) == 0)
         break;
-      close(sock);
+      socketclose(sock);
       sock = -1;
     }
     res = res->ai_next;
@@ -440,7 +415,7 @@ ConnectClientToTcpAddr6(const char *hostname, int port)
   if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		 (char *)&one, sizeof(one)) < 0) {
     rfbClientErr("ConnectToTcpAddr: setsockopt\n");
-    close(sock);
+    socketclose(sock);
     return -1;
   }
 
@@ -474,7 +449,7 @@ ConnectClientToUnixSock(const char *sockFile)
 
   if (connect(sock, (struct sockaddr *)&addr, sizeof(addr.sun_family) + strlen(addr.sun_path)) < 0) {
     rfbClientErr("ConnectToUnixSock: connect\n");
-    close(sock);
+    socketclose(sock);
     return -1;
   }
 
@@ -510,12 +485,12 @@ FindFreeTcpPort(void)
   for (port = TUNNEL_PORT_OFFSET + 99; port > TUNNEL_PORT_OFFSET; port--) {
     addr.sin_port = htons((unsigned short)port);
     if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) == 0) {
-      close(sock);
+      socketclose(sock);
       return port;
     }
   }
 
-  close(sock);
+  socketclose(sock);
   return 0;
 }
 
@@ -565,13 +540,13 @@ ListenAtTcpPortAndAddress(int port, const char *address)
   if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR,
 		 (const char *)&one, sizeof(one)) < 0) {
     rfbClientErr("ListenAtTcpPort: setsockopt\n");
-    close(sock);
+    socketclose(sock);
     return -1;
   }
 
   if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
     rfbClientErr("ListenAtTcpPort: bind\n");
-    close(sock);
+    socketclose(sock);
     return -1;
   }
 
@@ -605,7 +580,7 @@ ListenAtTcpPortAndAddress(int port, const char *address)
     /* we have separate IPv4 and IPv6 sockets since some OS's do not support dual binding */
     if (p->ai_family == AF_INET6 && setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&one, sizeof(one)) < 0) {
       rfbClientErr("ListenAtTcpPortAndAddress: error in setsockopt IPV6_V6ONLY: %s\n", strerror(errno));
-      close(sock);
+      socketclose(sock);
       freeaddrinfo(servinfo);
       return -1;
     }
@@ -613,13 +588,13 @@ ListenAtTcpPortAndAddress(int port, const char *address)
 
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one)) < 0) {
       rfbClientErr("ListenAtTcpPortAndAddress: error in setsockopt SO_REUSEADDR: %s\n", strerror(errno));
-      close(sock);
+      socketclose(sock);
       freeaddrinfo(servinfo);
       return -1;
     }
 
     if (bind(sock, p->ai_addr, p->ai_addrlen) < 0) {
-      close(sock);
+      socketclose(sock);
       continue;
     }
 
@@ -637,7 +612,7 @@ ListenAtTcpPortAndAddress(int port, const char *address)
 
   if (listen(sock, 5) < 0) {
     rfbClientErr("ListenAtTcpPort: listen\n");
-    close(sock);
+    socketclose(sock);
     return -1;
   }
 
@@ -666,7 +641,7 @@ AcceptTcpConnection(int listenSock)
   if (setsockopt(sock, IPPROTO_TCP, TCP_NODELAY,
 		 (char *)&one, sizeof(one)) < 0) {
     rfbClientErr("AcceptTcpConnection: setsockopt\n");
-    close(sock);
+    socketclose(sock);
     return -1;
   }
 

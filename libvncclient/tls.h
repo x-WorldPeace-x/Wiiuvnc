@@ -33,7 +33,7 @@ rfbBool HandleVeNCryptAuth(rfbClient* client);
 
 /* Read desired bytes from TLS session.
  * It's a wrapper function over gnutls_record_recv() and return values
- * are same as read(), that is, >0 for actual bytes read, 0 for EOF,
+ * are same as recv(), that is, >0 for actual bytes read, 0 for EOF,
  * or EAGAIN, EINTR.
  * This should be a non-blocking call. Blocking is handled in sockets.c.
  */

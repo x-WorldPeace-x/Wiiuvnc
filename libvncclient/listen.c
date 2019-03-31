@@ -29,7 +29,9 @@
 #include <unistd.h>
 #endif
 #include <sys/types.h>
-#include <nsysnet/socket.h>
+
+#include <wiiu-socket.h>
+
 #if LIBVNCSERVER_HAVE_SYS_TIME_H
 #include <sys/time.h>
 #endif

@@ -37,25 +37,8 @@
 
 #include <errno.h>
 #include <rfb/rfbclient.h>
+#include <wiiu-socket.h>
 
-#ifdef WIN32
-#undef SOCKET
-#include <winsock2.h>
-#ifdef EWOULDBLOCK
-#undef EWOULDBLOCK
-#endif
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#define socklen_t int
-#define close closesocket
-#define read(sock,buf,len) recv(sock,buf,len,0)
-#define write(sock,buf,len) send(sock,buf,len,0)
-#ifdef LIBVNCSERVER_HAVE_WS2TCPIP_H
-#undef socklen_t
-#include <ws2tcpip.h>
-#endif /* LIBVNCSERVER_HAVE_WS2TCPIP_H */
-#else /* WIN32 */
-#include <arpa/inet.h>
-#endif /* WIN32 */
 
 #include "sasl.h"
 
@@ -538,7 +521,7 @@ ReadFromSASL(rfbClient* client, char *out, unsigned int n)
         encodedLen = 8192;
         encoded = (char *)malloc(encodedLen);
 
-        ret = read(client->sock, encoded, encodedLen);
+        ret = recv(client->sock, encoded, encodedLen, 0);
         if (ret < 0) {
             free(encoded);
             return ret;

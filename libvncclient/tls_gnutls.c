@@ -21,14 +21,7 @@
 #include <gnutls/x509.h>
 #include <rfb/rfbclient.h>
 #include <errno.h>
-#ifdef WIN32
-#undef SOCKET
-#include <windows.h>           /* for Sleep() */
-#define sleep(X) Sleep(1000*X) /* MinGW32 has no sleep() */
-#include <winsock2.h>
-#define read(sock,buf,len) recv(sock,buf,len,0)
-#define write(sock,buf,len) send(sock,buf,len,0)
-#endif
+#include <wiiu-socket.h>
 #include "tls.h"
 
 
@@ -196,7 +189,7 @@ PushTLS(gnutls_transport_ptr_t transport, const void *data, size_t len)
 
   while (1)
   {
-    ret = write(client->sock, data, len);
+    ret = send(client->sock, data, len, 0);
     if (ret < 0)
     {
 #ifdef WIN32
@@ -218,7 +211,7 @@ PullTLS(gnutls_transport_ptr_t transport, void *data, size_t len)
 
   while (1)
   {
-    ret = read(client->sock, data, len);
+    ret = recv(client->sock, data, len, 0);
     if (ret < 0)
     {
 #ifdef WIN32

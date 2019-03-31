@@ -6,7 +6,7 @@
 /* Enable 24 bit per pixel in native framebuffer */
 #define LIBVNCSERVER_ALLOW24BPP  1 
 
-/* work around when write() returns ENOENT but does not mean it */
+/* work around when send() returns ENOENT but does not mean it */
 /* #undef LIBVNCSERVER_ENOENT_WORKAROUND */
 
 /* Define to 1 if you have the <endian.h> header file. */

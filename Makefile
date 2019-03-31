@@ -11,7 +11,8 @@ VPATH	:= $(BASEDIR)
 TARGET		:=	wiiu-vnc
 BUILD		:=	build
 SOURCES		:=	src
-INCLUDES	:=	libvncclient/common \
+INCLUDES	:=	include \
+				libvncclient/common \
 				libvncclient
 ROMFS		:=	
 LIBS		:=	sdl2 SDL2_gfx SDL2_image SDL2_mixer SDL2_ttf freetype2 libpng libmpg123 vorbisidec libjpeg zlib libpng

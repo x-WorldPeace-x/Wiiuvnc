@@ -35,7 +35,7 @@
 #define _POSIX_SOURCE
 #endif
 
-#include <nsysnet/socket.h>
+#include <wiiu-socket.h>
 
 #include <stdio.h>
 #include <stdlib.h>
