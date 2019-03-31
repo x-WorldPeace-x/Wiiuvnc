@@ -2,12 +2,12 @@ image: devkitpro/devkitppc
 
 build:
     script:
-    - apt-get -y install dirmngr --install-recommends
+    - apt-get -y install dirmngr pkg-config --install-recommends
     - curl https://fling.heyquark.com/fling-key.pub | dkp-pacman-key -a -
     - dkp-pacman-key --lsign 6F986ED22C5B9003
     - printf "[wiiu-fling]\nServer = https://fling.heyquark.com" >> /opt/devkitpro/pacman/etc/pacman.conf
     - dkp-pacman -Syu
-    - dkp-pacman -S wut-linux wiiu-sdl2 devkitPPC wiiu-libromfs wiiu-sdl2_gfx wiiu-sdl2_image wiiu-sdl2_ttf wiiu-sdl2_mixer ppc-zlib ppc-bzip2 ppc-freetype ppc-libpng ppc-mpg123 wiiu-curl-headers ppc-pkg-config wiiu-pkg-config
+    - dkp-pacman -S --noconfirm wut-linux wiiu-sdl2 devkitPPC wiiu-libromfs wiiu-sdl2_gfx wiiu-sdl2_image wiiu-sdl2_ttf wiiu-sdl2_mixer ppc-zlib ppc-bzip2 ppc-freetype ppc-libpng ppc-mpg123 wiiu-curl-headers ppc-pkg-config wiiu-pkg-config
     - make
 
     artifacts:
