@@ -3,7 +3,7 @@ image: devkitpro/devkitppc
 build:
     script:
     - apt-get -y install dirmngr --install-recommends
-    - curl https://fling.heyquark.com/fling-key.pub | (dkp-)pacman-key -a -
+    - curl https://fling.heyquark.com/fling-key.pub | dkp-pacman-key -a -
     - dkp-pacman-key --lsign 6F986ED22C5B9003
     - printf "[wiiu-fling]\nServer = https://fling.heyquark.com" >> /opt/devkitpro/pacman/etc/pacman.conf
     - dkp-pacman -Syu
