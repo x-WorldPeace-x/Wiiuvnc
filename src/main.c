@@ -2,6 +2,11 @@
  * @example SDLvncviewer.c
  */
 
+#include <unistd.h>
+#include <whb/log.h>
+#include <whb/log_udp.h>
+#include <sys/iosupport.h>
+
 #include <SDL.h>
 #include <rfb/rfbclient.h>
 
@@ -23,7 +28,18 @@ struct { char mask; int bits_stored; } utf8Mapping[]= {
 	{0,0}
 };
 
-static int enableResizable = 1, viewOnly, listenLoop, buttonMask;
+
+
+int i_argc = 2;
+
+/* Yes, they are fixed-size buffers :P */
+char vnc_host[256];
+char vnc_user[256];
+char vnc_password[256];
+char *i_argv[2] = {"wiiu-vnc", vnc_host};
+
+
+static int viewOnly, listenLoop, buttonMask;
 int sdlFlags;
 SDL_Texture *sdlTexture;
 SDL_Renderer *sdlRenderer;
@@ -36,9 +52,6 @@ static int rightAltKeyDown, leftAltKeyDown;
 static rfbBool resize(rfbClient* client) {
 	int width=client->width,height=client->height,
 		depth=client->format.bitsPerPixel;
-
-	if (enableResizable)
-		sdlFlags |= SDL_WINDOW_RESIZABLE;
 
 	client->updateRect.x = client->updateRect.y = 0;
 	client->updateRect.w = width; client->updateRect.h = height;
@@ -381,7 +394,6 @@ static void got_selection(rfbClient *cl, const char *text, int len)
 	    rfbClientErr("could not set received clipboard text: %s\n", SDL_GetError());
 }
 
-
 static rfbCredential* get_credential(rfbClient* cl, int credentialType){
         rfbCredential *c = malloc(sizeof(rfbCredential));
 	c->userCredential.username = malloc(RFB_BUF_SIZE);
@@ -393,10 +405,11 @@ static rfbCredential* get_credential(rfbClient* cl, int credentialType){
 	}
 
 	rfbClientLog("username and password required for authentication!\n");
-	printf("user: ");
-	fgets(c->userCredential.username, RFB_BUF_SIZE, stdin);
-	printf("pass: ");
-	fgets(c->userCredential.password, RFB_BUF_SIZE, stdin);
+
+	/* user */
+	strncpy(c->userCredential.username, vnc_user, RFB_BUF_SIZE);
+	/* password */
+	strncpy(c->userCredential.password, vnc_password, RFB_BUF_SIZE);
 
 	/* remove trailing newlines */
 	c->userCredential.username[strcspn(c->userCredential.username, "\n")] = 0;
@@ -405,31 +418,37 @@ static rfbCredential* get_credential(rfbClient* cl, int credentialType){
 	return c;
 }
 
-int main(int argc,char** argv) {
+static devoptab_t dotab_stdout;
+
+static ssize_t wiiu_log_write (struct _reent *r, void *fd, const char *ptr, size_t len) {
+	WHBLogPrintf("%*.*s", len, len, ptr);
+	return len;
+}
+
+static void wiiu_log_setup () {
+	WHBLogUdpInit();
+	memset(&dotab_stdout, 0, sizeof(devoptab_t));
+	dotab_stdout.name = "stdout_udp";
+	dotab_stdout.write_r = &wiiu_log_write;
+	devoptab_list[STD_OUT] = &dotab_stdout;
+	devoptab_list[STD_ERR] = &dotab_stdout;
+}
+
+int main() {
 	rfbClient* cl;
 	int i, j;
 	SDL_Event e;
 
-	for (i = 1, j = 1; i < argc; i++)
-		if (!strcmp(argv[i], "-viewonly"))
-			viewOnly = 1;
-		else if (!strcmp(argv[i], "-resizable"))
-			enableResizable = 1;
-		else if (!strcmp(argv[i], "-no-resizable"))
-			enableResizable = 0;
-		else if (!strcmp(argv[i], "-listen")) {
-		        listenLoop = 1;
-			argv[i] = "-listennofork";
-                        ++j;
-		}
-		else {
-			if (i != j)
-				argv[j] = argv[i];
-			j++;
-		}
-	argc = j;
+	wiiu_log_setup();
 
-	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
+	/* Load VNC credentials */
+	FILE *f = fopen("fs:/vol/external01/vnc.txt", "r");
+	fscanf(f, "%256s\n%256s\n%256s\n", vnc_host, vnc_user, vnc_password);
+	fclose(f);
+
+	printf("-- vnc settings --:\nhost: %s\nuser: %s\n", vnc_host, vnc_user);
+
+	SDL_Init(SDL_INIT_VIDEO);
 	atexit(SDL_Quit);
 
 	do {
@@ -444,7 +463,7 @@ int main(int argc,char** argv) {
 	  cl->GetCredential = get_credential;
 	  cl->listenPort = LISTEN_PORT_OFFSET;
 	  cl->listen6Port = LISTEN_PORT_OFFSET;
-	  if(!rfbInitClient(cl,&argc,argv))
+	  if(!rfbInitClient(cl,&i_argc,i_argv))
 	    {
 	      cl = NULL; /* rfbInitClient has already freed the client struct */
 	      cleanup(cl);
