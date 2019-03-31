@@ -2,9 +2,10 @@ image: devkitpro/devkitppc
 
 build:
     script:
+    - whoami
     - dkp-pacman-key --recv-key 6F986ED22C5B9003
     - dkp-pacman-key --lsign 6F986ED22C5B9003
-    - echo "[wiiu-fling]\nServer = https://fling.heyquark.com" >> /opt/devkitpro/pacman/etc/pacman.conf
+    - printf "[wiiu-fling]\nServer = https://fling.heyquark.com" >> /opt/devkitpro/pacman/etc/pacman.conf
     - dkp-pacman -Syu
     - dkp-pacman -S wut-linux wiiu-sdl2 devkitPPC wiiu-libromfs wiiu-sdl2_gfx wiiu-sdl2_image wiiu-sdl2_ttf wiiu-sdl2_mixer ppc-zlib ppc-bzip2 ppc-freetype ppc-libpng ppc-mpg123 wiiu-curl-headers ppc-pkg-config wiiu-pkg-config
     - make
