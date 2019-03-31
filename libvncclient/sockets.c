@@ -34,7 +34,6 @@
 #include <unistd.h>
 #endif
 #include <errno.h>
-#include <fcntl.h>
 #include <assert.h>
 #include <rfb/rfbclient.h>
 #ifdef WIN32
@@ -687,8 +686,8 @@ SetNonBlocking(int sock)
   if(ioctlsocket(sock, FIONBIO, &block) == SOCKET_ERROR) {
     errno=WSAGetLastError();
 #else
-  int flags = fcntl(sock, F_GETFL);
-  if(flags < 0 || fcntl(sock, F_SETFL, flags | O_NONBLOCK) < 0) {
+  int32_t nonblock = 1;
+  if (setsockopt(sock, SOL_SOCKET, SO_NONBLOCK, &nonblock, sizeof(nonblock))) {
 #endif
     rfbClientErr("Setting socket to non-blocking failed: %s\n",strerror(errno));
     return FALSE;

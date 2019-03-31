@@ -13,7 +13,7 @@
 /* #undef LIBVNCSERVER_HAVE_ENDIAN_H */
 
 /* Define to 1 if you have the <fcntl.h> header file. */
-#define LIBVNCSERVER_HAVE_FCNTL_H  1 
+/* #undef LIBVNCSERVER_HAVE_FCNTL_H */
 
 /* Define to 1 if you have the `gettimeofday' function. */
 #define LIBVNCSERVER_HAVE_GETTIMEOFDAY  1 
