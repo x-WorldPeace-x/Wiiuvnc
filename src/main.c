@@ -28,13 +28,10 @@ struct { char mask; int bits_stored; } utf8Mapping[]= {
 	{0,0}
 };
 
-
-
 int i_argc = 2;
 
 /* Yes, they are fixed-size buffers :P */
 char vnc_host[256];
-char vnc_user[256];
 char vnc_password[256];
 char *i_argv[2] = {"wiiu-vnc", vnc_host};
 
@@ -221,32 +218,6 @@ static void update(rfbClient* cl,int x,int y,int w,int h) {
 	SDL_RenderPresent(sdlRenderer);
 }
 
-static void kbd_leds(rfbClient* cl, int value, int pad) {
-	/* note: pad is for future expansion 0=unused */
-	fprintf(stderr,"Led State= 0x%02X\n", value);
-	fflush(stderr);
-}
-
-/* trivial support for textchat */
-static void text_chat(rfbClient* cl, int value, char *text) {
-	switch(value) {
-	case rfbTextChatOpen:
-		fprintf(stderr,"TextChat: We should open a textchat window!\n");
-		TextChatOpen(cl);
-		break;
-	case rfbTextChatClose:
-		fprintf(stderr,"TextChat: We should close our window!\n");
-		break;
-	case rfbTextChatFinished:
-		fprintf(stderr,"TextChat: We should close our window!\n");
-		break;
-	default:
-		fprintf(stderr,"TextChat: Received \"%s\"\n", text);
-		break;
-	}
-	fflush(stderr);
-}
-
 static void cleanup(rfbClient* cl)
 {
   /*
@@ -263,36 +234,6 @@ static void cleanup(rfbClient* cl)
 static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 {
 	switch(e->type) {
-	case SDL_WINDOWEVENT:
-	    switch (e->window.event) {
-	    case SDL_WINDOWEVENT_EXPOSED:
-		SendFramebufferUpdateRequest(cl, 0, 0,
-					cl->width, cl->height, FALSE);
-		break;
-	    case SDL_WINDOWEVENT_FOCUS_GAINED:
-                if (SDL_HasClipboardText()) {
-		        char *text = SDL_GetClipboardText();
-			if(text) {
-			    rfbClientLog("sending clipboard text '%s'\n", text);
-			    SendClientCutText(cl, text, strlen(text));
-			}
-		}
-
-		break;
-	    case SDL_WINDOWEVENT_FOCUS_LOST:
-		if (rightAltKeyDown) {
-			SendKeyEvent(cl, XK_Alt_R, FALSE);
-			rightAltKeyDown = FALSE;
-			rfbClientLog("released right Alt key\n");
-		}
-		if (leftAltKeyDown) {
-			SendKeyEvent(cl, XK_Alt_L, FALSE);
-			leftAltKeyDown = FALSE;
-			rfbClientLog("released left Alt key\n");
-		}
-		break;
-	    }
-	    break;
 	case SDL_MOUSEWHEEL:
 	{
 	        int steps;
@@ -371,7 +312,7 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 		SendKeyEvent(cl, sym, FALSE);
                 break;
 	case SDL_QUIT:
-                if(listenLoop)
+          if(listenLoop)
 		  {
 		    cleanup(cl);
 		    return FALSE;
@@ -387,45 +328,21 @@ static rfbBool handleSDLEvent(rfbClient *cl, SDL_Event *e)
 	return TRUE;
 }
 
-static void got_selection(rfbClient *cl, const char *text, int len)
+static char *get_password(rfbClient *cl)
 {
-        rfbClientLog("received clipboard text '%s'\n", text);
-        if(SDL_SetClipboardText(text) != 0)
-	    rfbClientErr("could not set received clipboard text: %s\n", SDL_GetError());
-}
-
-static rfbCredential* get_credential(rfbClient* cl, int credentialType){
-        rfbCredential *c = malloc(sizeof(rfbCredential));
-	c->userCredential.username = malloc(RFB_BUF_SIZE);
-	c->userCredential.password = malloc(RFB_BUF_SIZE);
-
-	if(credentialType != rfbCredentialTypeUser) {
-	    rfbClientErr("something else than username and password required for authentication\n");
-	    return NULL;
-	}
-
-	rfbClientLog("username and password required for authentication!\n");
-
-	/* user */
-	strncpy(c->userCredential.username, vnc_user, RFB_BUF_SIZE);
-	/* password */
-	strncpy(c->userCredential.password, vnc_password, RFB_BUF_SIZE);
-
-	/* remove trailing newlines */
-	c->userCredential.username[strcspn(c->userCredential.username, "\n")] = 0;
-	c->userCredential.password[strcspn(c->userCredential.password, "\n")] = 0;
-
-	return c;
+	return strdup(vnc_password);
 }
 
 static devoptab_t dotab_stdout;
 
-static ssize_t wiiu_log_write (struct _reent *r, void *fd, const char *ptr, size_t len) {
-	WHBLogPrintf("%*.*s", len, len, ptr);
+static ssize_t wiiu_log_write(struct _reent *r, void *fd, const char *ptr, size_t len)
+{
+	WHBLogWritef("%*.*s", len, len, ptr);
 	return len;
 }
 
-static void wiiu_log_setup () {
+static void wiiu_log_setup()
+{
 	WHBLogUdpInit();
 	memset(&dotab_stdout, 0, sizeof(devoptab_t));
 	dotab_stdout.name = "stdout_udp";
@@ -434,7 +351,8 @@ static void wiiu_log_setup () {
 	devoptab_list[STD_ERR] = &dotab_stdout;
 }
 
-int main() {
+int main()
+{
 	rfbClient* cl;
 	int i, j;
 	SDL_Event e;
@@ -443,10 +361,8 @@ int main() {
 
 	/* Load VNC credentials */
 	FILE *f = fopen("fs:/vol/external01/vnc.txt", "r");
-	fscanf(f, "%256s\n%256s\n%256s\n", vnc_host, vnc_user, vnc_password);
+	fscanf(f, "%256s\n%256s\n", vnc_host, vnc_password);
 	fclose(f);
-
-	printf("-- vnc settings --:\nhost: %s\nuser: %s\n", vnc_host, vnc_user);
 
 	SDL_Init(SDL_INIT_VIDEO);
 	atexit(SDL_Quit);
@@ -454,16 +370,12 @@ int main() {
 	do {
 	  /* 16-bit: cl=rfbGetClient(5,3,2); */
 	  cl=rfbGetClient(8,3,4);
-	  cl->MallocFrameBuffer=resize;
+	  cl->MallocFrameBuffer = resize;
 	  cl->canHandleNewFBSize = TRUE;
-	  cl->GotFrameBufferUpdate=update;
-	  cl->HandleKeyboardLedState=kbd_leds;
-	  cl->HandleTextChat=text_chat;
-	  cl->GotXCutText = got_selection;
-	  cl->GetCredential = get_credential;
+	  cl->GotFrameBufferUpdate = update;
+      cl->GetPassword = get_password;
 	  cl->listenPort = LISTEN_PORT_OFFSET;
-	  cl->listen6Port = LISTEN_PORT_OFFSET;
-	  if(!rfbInitClient(cl,&i_argc,i_argv))
+	  if(!rfbInitClient(cl, &i_argc, i_argv))
 	    {
 	      cl = NULL; /* rfbInitClient has already freed the client struct */
 	      cleanup(cl);

@@ -571,9 +571,8 @@ HandleVncAuth(rfbClient *client)
     if (!ReadFromRFBServer(client, (char *)challenge, CHALLENGESIZE)) return FALSE;
 
     if (client->serverPort!=-1) { /* if not playing a vncrec file */
-//      if (client->GetPassword)
-//        passwd = client->GetPassword(client);
-	  passwd = "password";
+      if (client->GetPassword)
+        passwd = client->GetPassword(client);
 
       if ((!passwd) || (strlen(passwd) == 0)) {
         rfbClientLog("Reading password failed\n");
@@ -586,10 +585,10 @@ HandleVncAuth(rfbClient *client)
       rfbClientEncryptBytes(challenge, passwd);
 
       /* Lose the password from memory */
-//      for (i = strlen(passwd); i >= 0; i--) {
-//        passwd[i] = '\0';
-//      }
-//      free(passwd);
+      for (i = strlen(passwd); i >= 0; i--) {
+        passwd[i] = '\0';
+      }
+      free(passwd);
 
       if (!WriteToRFBServer(client, (char *)challenge, CHALLENGESIZE)) return FALSE;
     }

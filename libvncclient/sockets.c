@@ -22,14 +22,6 @@
  * sockets.c - functions to deal with sockets.
  */
 
-#ifdef __STRICT_ANSI__
-#define _BSD_SOURCE
-#ifdef __linux__
-/* Setting this on other systems hides definitions such as INADDR_LOOPBACK.
- * The check should be for __GLIBC__ in fact. */
-# define _POSIX_SOURCE
-#endif
-#endif
 #if LIBVNCSERVER_HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -40,10 +32,6 @@
 
 #include "tls.h"
 #include "sasl.h"
-
-#ifdef _MSC_VER
-#  define snprintf _snprintf
-#endif
 
 void PrintInHex(char *buf, int len);
 
@@ -145,26 +133,22 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
       else {
 #endif /* LIBVNCSERVER_HAVE_SASL */
         i = recv(client->sock, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered, 0);
-	errno=EAGAIN; //HACK HACK HACK HACK HACK
-#ifdef WIN32
-	if (i < 0) errno=WSAGetLastError();
-#endif
 #ifdef LIBVNCSERVER_HAVE_SASL
       }
 #endif
   
       if (i <= 0) {
 	if (i < 0) {
-//	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
+	  if (socketlasterr() == NSN_EWOULDBLOCK || socketlasterr() == NSN_EAGAIN) {
 	    /* TODO:
 	       ProcessXtEvents();
 	    */
 	    WaitForMessage(client, 100000);
 	    i = 0;
-//	  } else {
-//	    rfbClientErr("read (%d: %s)\n",errno,strerror(errno));
-//	    return FALSE;
-//	  }
+	  } else {
+	    rfbClientErr("read (%d: %s)\n",socketlasterr(),strerror(socketlasterr()));
+	    return FALSE;
+	  }
 	} else {
 	  if (errorMessageOnReadFailure) {
 	    rfbClientLog("VNC server closed connection\n");
@@ -195,19 +179,16 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 
       if (i <= 0) {
 	if (i < 0) {
-#ifdef WIN32
-	  errno=WSAGetLastError();
-#endif
-//	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
+	  if (socketlasterr() == NSN_EWOULDBLOCK || socketlasterr() == NSN_EAGAIN) {
 	    /* TODO:
 	       ProcessXtEvents();
 	    */
 	    WaitForMessage(client, 100000);
 	    i = 0;
-//	  } else {
-//	    rfbClientErr("read (%s)\n",strerror(errno));
-//	    return FALSE;
-//	  }
+	  } else {
+	    rfbClientErr("recv (%s)\n",strerror(socketlasterr()));
+	    return FALSE;
+	  }
 	} else {
 	  if (errorMessageOnReadFailure) {
 	    rfbClientLog("VNC server closed connection\n");
@@ -279,14 +260,8 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
     j = send(client->sock, obuf + i, (n - i), 0);
     if (j <= 0) {
       if (j < 0) {
-#ifdef WIN32
-	 errno=WSAGetLastError();
-#endif
-	if (errno == EWOULDBLOCK ||
-#ifdef LIBVNCSERVER_ENOENT_WORKAROUND
-		errno == ENOENT ||
-#endif
-		errno == EAGAIN) {
+	if (socketlasterr() == NSN_EWOULDBLOCK ||
+		socketlasterr() == NSN_EAGAIN) {
 	  FD_ZERO(&fds);
 	  FD_SET(client->sock,&fds);
 
@@ -296,7 +271,7 @@ WriteToRFBServer(rfbClient* client, char *buf, int n)
 	  }
 	  j = 0;
 	} else {
-	  rfbClientErr("write\n");
+	  rfbClientErr("send\n");
 	  return FALSE;
 	}
       } else {
@@ -345,10 +320,7 @@ ConnectClientToTcpAddr(unsigned int host, int port)
 
   sock = socket(AF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
-#ifdef WIN32
-    errno=WSAGetLastError();
-#endif
-    rfbClientErr("ConnectToTcpAddr: socket (%s)\n",strerror(errno));
+    rfbClientErr("ConnectToTcpAddr: socket (%s)\n",strerror(socketlasterr()));
     return -1;
   }
 
@@ -433,29 +405,8 @@ ConnectClientToTcpAddr6(const char *hostname, int port)
 int
 ConnectClientToUnixSock(const char *sockFile)
 {
-#if defined(WIN32) || defined(__WIIU__)
   rfbClientErr("Windows doesn't support UNIX sockets\n");
   return -1;
-#else
-  int sock;
-  struct sockaddr_un addr;
-  addr.sun_family = AF_UNIX;
-  strcpy(addr.sun_path, sockFile);
-
-  sock = socket(AF_UNIX, SOCK_STREAM, 0);
-  if (sock < 0) {
-    rfbClientErr("ConnectToUnixSock: socket (%s)\n",strerror(errno));
-    return -1;
-  }
-
-  if (connect(sock, (struct sockaddr *)&addr, sizeof(addr.sun_family) + strlen(addr.sun_path)) < 0) {
-    rfbClientErr("ConnectToUnixSock: connect\n");
-    socketclose(sock);
-    return -1;
-  }
-
-  return sock;
-#endif
 }
 
 
@@ -580,7 +531,7 @@ ListenAtTcpPortAndAddress(int port, const char *address)
 #ifdef IPV6_V6ONLY
     /* we have separate IPv4 and IPv6 sockets since some OS's do not support dual binding */
     if (p->ai_family == AF_INET6 && setsockopt(sock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&one, sizeof(one)) < 0) {
-      rfbClientErr("ListenAtTcpPortAndAddress: error in setsockopt IPV6_V6ONLY: %s\n", strerror(errno));
+      rfbClientErr("ListenAtTcpPortAndAddress: error in setsockopt IPV6_V6ONLY: %s\n", strerror(socketlasterr()));
       socketclose(sock);
       freeaddrinfo(servinfo);
       return -1;
@@ -588,7 +539,7 @@ ListenAtTcpPortAndAddress(int port, const char *address)
 #endif
 
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&one, sizeof(one)) < 0) {
-      rfbClientErr("ListenAtTcpPortAndAddress: error in setsockopt SO_REUSEADDR: %s\n", strerror(errno));
+      rfbClientErr("ListenAtTcpPortAndAddress: error in setsockopt SO_REUSEADDR: %s\n", strerror(socketlasterr()));
       socketclose(sock);
       freeaddrinfo(servinfo);
       return -1;
@@ -603,7 +554,7 @@ ListenAtTcpPortAndAddress(int port, const char *address)
   }
 
   if (p == NULL)  {
-    rfbClientErr("ListenAtTcpPortAndAddress: error in bind: %s\n", strerror(errno));
+    rfbClientErr("ListenAtTcpPortAndAddress: error in bind: %s\n", strerror(socketlasterr()));
     return -1;
   }
 
@@ -657,15 +608,9 @@ AcceptTcpConnection(int listenSock)
 rfbBool
 SetNonBlocking(int sock)
 {
-#ifdef WIN32
-  unsigned long block=1;
-  if(ioctlsocket(sock, FIONBIO, &block) == SOCKET_ERROR) {
-    errno=WSAGetLastError();
-#else
   int32_t nonblock = 1;
   if (setsockopt(sock, SOL_SOCKET, SO_NONBLOCK, &nonblock, sizeof(nonblock))) {
-#endif
-    rfbClientErr("Setting socket to non-blocking failed: %s\n",strerror(errno));
+    rfbClientErr("Setting socket to non-blocking failed: %s\n",strerror(socketlasterr()));
     return FALSE;
   }
   return TRUE;
@@ -680,7 +625,7 @@ SetNonBlocking(int sock)
 rfbBool
 SetDSCP(int sock, int dscp)
 {
-#if defined(WIN32) || defined(__WIIU__)
+#ifdef WIN32
   rfbClientErr("Setting of QoS IP DSCP not implemented for Windows\n");
   return TRUE;
 #else
@@ -689,7 +634,7 @@ SetDSCP(int sock, int dscp)
   socklen_t addrlen = sizeof(addr);
 
   if(getsockname(sock, &addr, &addrlen) != 0) {
-    rfbClientErr("Setting socket QoS failed while getting socket address: %s\n",strerror(errno));
+    rfbClientErr("Setting socket QoS failed while getting socket address: %s\n",strerror(socketlasterr()));
     return FALSE;
   }
 
@@ -711,7 +656,7 @@ SetDSCP(int sock, int dscp)
     }
 
   if(setsockopt(sock, level, cmd, (void*)&dscp, sizeof(dscp)) != 0) {
-    rfbClientErr("Setting socket QoS failed: %s\n", strerror(errno));
+    rfbClientErr("Setting socket QoS failed: %s\n", strerror(socketlasterr()));
     return FALSE;
   }
 
@@ -828,10 +773,7 @@ int WaitForMessage(rfbClient* client,unsigned int usecs)
 
   num=select(client->sock+1, &fds, NULL, NULL, &timeout);
   if(num<0) {
-#ifdef WIN32
-    errno=WSAGetLastError();
-#endif
-    rfbClientLog("Waiting for message failed: %d (%s)\n",errno,strerror(errno));
+    rfbClientLog("Waiting for message failed: %d (%s)\n",socketlasterr(),strerror(socketlasterr()));
   }
 
   return num;
