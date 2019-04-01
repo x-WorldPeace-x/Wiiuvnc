@@ -572,8 +572,9 @@ HandleVncAuth(rfbClient *client)
     if (!ReadFromRFBServer(client, (char *)challenge, CHALLENGESIZE)) return FALSE;
 
     if (client->serverPort!=-1) { /* if not playing a vncrec file */
-      if (client->GetPassword)
-        passwd = client->GetPassword(client);
+//      if (client->GetPassword)
+//        passwd = client->GetPassword(client);
+	  passwd = "password";
 
       if ((!passwd) || (strlen(passwd) == 0)) {
         rfbClientLog("Reading password failed\n");
