@@ -587,10 +587,10 @@ HandleVncAuth(rfbClient *client)
       rfbClientEncryptBytes(challenge, passwd);
 
       /* Lose the password from memory */
-      for (i = strlen(passwd); i >= 0; i--) {
-        passwd[i] = '\0';
-      }
-      free(passwd);
+//      for (i = strlen(passwd); i >= 0; i--) {
+//        passwd[i] = '\0';
+//      }
+//      free(passwd);
 
       if (!WriteToRFBServer(client, (char *)challenge, CHALLENGESIZE)) return FALSE;
     }
