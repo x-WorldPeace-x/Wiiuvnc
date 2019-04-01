@@ -154,16 +154,16 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
   
       if (i <= 0) {
 	if (i < 0) {
-	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
+//	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
 	    /* TODO:
 	       ProcessXtEvents();
 	    */
 	    WaitForMessage(client, 100000);
 	    i = 0;
-	  } else {
-	    rfbClientErr("read (%d: %s)\n",errno,strerror(errno));
-	    return FALSE;
-	  }
+//	  } else {
+//	    rfbClientErr("read (%d: %s)\n",errno,strerror(errno));
+//	    return FALSE;
+//	  }
 	} else {
 	  if (errorMessageOnReadFailure) {
 	    rfbClientLog("VNC server closed connection\n");
@@ -197,16 +197,16 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
 #ifdef WIN32
 	  errno=WSAGetLastError();
 #endif
-	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
+//	  if (errno == EWOULDBLOCK || errno == EAGAIN) {
 	    /* TODO:
 	       ProcessXtEvents();
 	    */
 	    WaitForMessage(client, 100000);
 	    i = 0;
-	  } else {
-	    rfbClientErr("read (%s)\n",strerror(errno));
-	    return FALSE;
-	  }
+//	  } else {
+//	    rfbClientErr("read (%s)\n",strerror(errno));
+//	    return FALSE;
+//	  }
 	} else {
 	  if (errorMessageOnReadFailure) {
 	    rfbClientLog("VNC server closed connection\n");
