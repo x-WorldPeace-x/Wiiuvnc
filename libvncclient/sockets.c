@@ -145,6 +145,7 @@ ReadFromRFBServer(rfbClient* client, char *out, unsigned int n)
       else {
 #endif /* LIBVNCSERVER_HAVE_SASL */
         i = recv(client->sock, client->buf + client->buffered, RFB_BUF_SIZE - client->buffered, 0);
+	errno=EAGAIN; //HACK HACK HACK HACK HACK
 #ifdef WIN32
 	if (i < 0) errno=WSAGetLastError();
 #endif
