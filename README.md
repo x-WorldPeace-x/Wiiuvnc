@@ -7,7 +7,6 @@ With some experience from linux-wiiu and a bunch of crazy hardware hacking, we'v
 Put a text file on the SD card at sd:/vnc.txt with the following format:
 ```
 <IP address>
-<username>
 <password>
 
 ```
